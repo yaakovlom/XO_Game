@@ -1,4 +1,5 @@
 import os
+import time
 
 class Lines():
     def __init__(self, xo_list, size=17):
@@ -8,40 +9,49 @@ class Lines():
         self.lines = []
         self.x = \
             [
-                "\\      /",
-                "  \\  /  ",
-                "   \\/   ",
-                "   /\\   ",
-                "  /  \\  ",
-                "/      \\"
+                "  \\        /  ",
+                "    \\    /    ",
+                "      \\/      ",
+                "      /\\      ",
+                "    /    \\    ",
+                "  /        \\  "
             ]
         self.o =\
             [
-                "  ----  ",
-                " /    \\",
-                "|      |",
-                "|      |",
-                " \\    /",
-                "  ----  "
+                "     ----     ",
+                "    /    \\    ",
+                "   |      |   ",
+                "   |      |   ",
+                "    \\    /    ",
+                "     ----     "
             ]
         self._set_lines()
 
     def _set_lines(self):
-        line = self.get_clean_line()
         for l in range(6):
+            line = self.get_base_line()
             for i in range(3):
-                xo = self.xo_list[i]
-                if xo:
-                    self._add_xo(xo, line, (i, l))
+                if not self.xo_list[i]:
+                    xo = "              "
+                elif self.xo_list[i] == "x":
+                    xo = self.x[l]
+                else:
+                    xo = self.o[l]
+                line = self._add_xo(xo, line, i)
             self.lines.append(line)
 
-    def _add_xo(self, xo, line, idx):
-        start = idx[0]*self.size + 1
-        xo = self.x if xo == "x" else self.o
-        line[start : start + len(xo)] = xo[idx[1]]
-    
-    def set_xo_list(self, xo_list:list):
-        self.xo_list = xo_list
+    def _add_xo(self, xo:str, line:str, idx:int):
+        line = line.replace(str(idx) * self.size, xo)
+        return line
+
+    def get_base_line(self):
+        cube = "|" + " "
+        line = ""
+        for i in range(3):
+            _cube = cube.replace(" ", str(i) * self.size)
+            line += _cube
+        line += "|"
+        return line
 
     def get_clean_line(self):
         cube = "|" + " " * self.size
@@ -58,39 +68,91 @@ class Lines():
         return line
 
 
-def print_board(size:int, xo_list:list, lines:Lines):
-    split_line = lines.get_split_line()
-    clean_line = lines.get_clean_line()
-    print(split_line)
+def print_board(xo_list:list):
     for i in range(3):
-        print(clean_line)
+        lines = Lines(xo_list[i], 14)
+        print(lines.get_split_line())
         for i in range(6):
             print(lines.get_line())
-        print(clean_line)
-        print(split_line)
+    print(lines.get_split_line())
 
 
-def check_move(i:int, xo_list:list):
-    pass
+def check_move(move:int, move_list:list):
+    if len(move_list) == 3 and move_list[2] - move_list[1] > 2\
+        and move_list[2] - move_list[1] == move_list[1] - move_list[0]: # lite check
+        return move_list
+    if move == 4: #  last move is in middle space
+        for i in range(4):
+            if i in move_list and 8 - i in move_list:
+                return [i, move, 8 - i]
+    else:
+        if (move + 3) % 9 in move_list and (move - 3) % 9 in move_list: # check column
+            return [(move + 3) % 9 for i in range(3)]
+        else:
+            row_center = move // 3 * 3 + 1
+            if row_center - move and row_center in move_list and row_center * 2 - move in move_list: # check rows
+                return [move, row_center, row_center * 2 - move]
+            elif (not row_center - move) and move + 1 in move_list and move - 1 in move_list:
+                return [move - 1, move, move + 1]
+        if 4 in move_list and 8 - move in move_list: # check slash
+                return [move, 4, 8 - move]
+    return {}
 
 
-def game():
-    xo_list = ["" for i in range(9)]
-    lines = Lines(xo_list, 17)
+def intro(xo_list):
+    _xo_list = [\
+        ["x", "o", "x"],
+        ["o", "x", "o"],
+        ["x", "o", "x"],
+        ]
+    for i in range(6):
+        os.system("cls")
+        print_board(_xo_list if i % 2 else xo_list)
+        time.sleep(0.25)
+
+
+
+
+def game(xo_list):
     finish = False
     counter = 0
-    print_board(17, xo_list, lines)
+    move_list = [[], []]
     while not finish:
-        x, y = input("Enter row and column to add a move: ")
-        if 0 < x < 4 and 0 < x < 4:
-            xo_list[x * y] = "x" if counter % 2 else "o"
-            lines.set_xo_list(xo_list)
-            check_move(x*y, xo_list)
-            os.system("cls")
-            print_board(17, xo_list, lines)
+        os.system("cls")
+        print_board(xo_list)
+        move = int(input("Enter number (1-9) for the next move: ")) - 1
+        if 0 <= move < 9 and not xo_list[move // 3][move % 3]:
+            player = counter % 2
+            xo_list[move // 3][move % 3] = "x" if player else "o"
+            move_list[player].append(move)
+            move_list[player] = sorted(move_list[player])
+            if counter >= 4:
+                finish = check_move(move, move_list[player])
+            if counter == 8:
+                break
             counter += 1
-        else:
-            continue
+    return finish, xo_list
+
+def winner(win, xo_list):
+    char = xo_list[win[0] // 3][win[0] % 3]
+    for i in range(9):
+        for xo in win:
+            xo_list[xo // 3][xo % 3] = "" if i % 2 else char
+        os.system("cls")
+        print_board(xo_list)
+        time.sleep(0.25)
+
+def main():
+    xo_list = [["", "", ""] for i in range(3)]
+    intro(xo_list)
+    win, xo_list = game(xo_list)
+    if win:
+        winner(win, xo_list)
+    else:
+        os.system("cls")
+        print("\n\n\n\n\n\n")
+        print("game over..".center(40))
+        print("\n\n\n\n\n\n")
 
 if __name__ == "__main__":
-    game()
+    main()
